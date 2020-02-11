@@ -1,0 +1,5 @@
+int x
+int y=19
+int z=11
+read(x)
+write(x+y+z)
