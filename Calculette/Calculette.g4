@@ -10,13 +10,29 @@ grammar Calculette;
                 return "ADD";
             } else if ( op.equals("-")) {
                 return "SUB" ;
-            }else if(op.equals("/")) {
-            return "DIV" ;
-            } else {
+            } else if(op.equals("/")) {
+              return "DIV" ;
+            } else if(op.equals("==")) {
+              return "EQUAL";
+            } else if(op.equals("!=")) {
+              return "NEQ";
+            } else if(op.equals("<")) {
+              return "INF";
+            } else if(op.equals("<=")) {
+              return "INFEQ";
+            } else if(op.equals(">")) {
+              return "SUP";
+            } else if(op.equals(">=")) {
+              return "SUPEQ";
+            } else if(op.equals("!=")) {
+              return "NEQ";
+            }
+            else {
             System.err.println("Opérateur arithmétique incorrect : '"+op+"'");
             throw new IllegalArgumentException("Opérateur arithmétique incorrect : '"+op+"'");
             }
         }
+
         private int _cur_label = 0;
         /** générateur de nom d'étiquettes */
         private int nextLabel() { return _cur_label++; }
@@ -34,7 +50,6 @@ grammar Calculette;
         NEWLINE*
 
         (instruction { $code += $instruction.code; })*
-
             { $code += "HALT"; }
         ;
 
@@ -43,7 +58,7 @@ grammar Calculette;
             |  a=expression op=('+'|'-') b=expression {$code= $a.code +  $b.code + fo($op.text) + "\n";}
             |  '(' e=expression ')'  { $code=$e.code ;}
             | ENTIER {$code = "PUSHI " + $ENTIER.text +"\n";}
-            | IDENTIFIANT 
+            | IDENTIFIANT
             {
                 AdresseType at = tableSymboles.getAdresseType($IDENTIFIANT.text);
                 int adr = at.adresse;
@@ -107,6 +122,14 @@ grammar Calculette;
             }
         ;
 
+    condition returns [String code]
+        : a=expr op=('==' || '!=' || '<' || '<=' || '>' || '>=' || '!=') b=expr { code = $a.code + fo(op) + $b.code; }
+        | a = condition '&&' b = condition { $code = $a.code + "\" + $b.code + "MUL" ; }
+        | a = condition op='||' b = condition { $code = ($a.code + $b.code) > 0 + "ADD \PUSHI 0"; }
+        | 'true'  { $code = "  PUSHI 1\n"; }
+        | 'false' { $code = "  PUSHI 0\n"; }
+        ;
+
     finInstruction : ( NEWLINE | ';' )+ ;
 
     // lexer
@@ -116,8 +139,8 @@ grammar Calculette;
 
     NEWLINE : '\r'? '\n';
 
-    WS :   (' '|'\t')+ -> skip  ;
+    WS :   (' '|'\t')+ -> skip;
 
-    ENTIER : ('0'..'9')+  ;
+    ENTIER : ('0'..'9')+;
 
     UNMATCH : . -> skip ;
