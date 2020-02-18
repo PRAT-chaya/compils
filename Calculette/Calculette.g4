@@ -124,7 +124,7 @@ grammar Calculette;
 
     condition returns [String code]
         : a=expr op=('==' || '!=' || '<' || '<=' || '>' || '>=' || '!=') b=expr { code = $a.code + fo(op) + $b.code; }
-        | a = condition '&&' b = condition { $code = $a.code + "\" + $b.code + "MUL" ; }
+        | a = condition '&&' b = condition { $code = $a.code + "\n" + $b.code + "MUL" ; }
         | a = condition op='||' b = condition { $code = ($a.code + $b.code) > 0 + "ADD \PUSHI 0"; }
         | 'true'  { $code = "  PUSHI 1\n"; }
         | 'false' { $code = "  PUSHI 0\n"; }
