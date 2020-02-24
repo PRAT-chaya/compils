@@ -1,0 +1,4 @@
+int f(int x, int y){
+	return 2 * x + y;
+}
+f(20, 2);

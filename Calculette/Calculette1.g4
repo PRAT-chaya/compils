@@ -1,7 +1,7 @@
 grammar Calculette;
 
     @parser::members {
-        private TablesSymboles tablesSymboles = new TablesSymboles();
+        private TableSymboles tableSymboles = new TableSymboles();
 
         private String fo (String op) {
             if ( op.equals("*") ) {
@@ -52,7 +52,9 @@ grammar Calculette;
         }
 
         private String logExp (String op) {
-            return null;
+            if () {
+                ;
+            }
         }
 
         private int _cur_label = 0;
@@ -63,99 +65,29 @@ grammar Calculette;
     start
         : calcul EOF;
 
+
     calcul returns [ String code ]
         @init{ $code = new String(); }   // On initialise code, pour ensuite l'utiliser comme accumulateur
         @after{ System.out.println($code); }
         :   (decl { $code += $decl.code; })*
-        {int entry = nextLabel(); $code += "JUMP " + entry + "\n"; }
+
         NEWLINE*
 
-        (fonction { $code += $fonction.code; })*
-        NEWLINE*
-
-        {$code += "LABEL " + entry + "\n"; }
         (instruction { $code += $instruction.code; })*
 
-        { $code += "HALT"; }
+            { $code += "HALT"; }
         ;
-
-    fonction returns [String code]
-        @init { //instancier la table locale
-            tablesSymboles.newTableLocale();
-        }
-        @after { //détruire la table locale
-            tablesSymboles.dropTableLocale();
-        }
-        :TYPE IDENTIFIANT '(' params ? ')'
-            {
-                int funcLabel = nextLabel();
-                $code = "LABEL " + funcLabel + "\n";
-                tablesSymboles.newFunction($IDENTIFIANT.text, funcLabel, $TYPE.text);
-                // code java pour gérer la déclaration de "la variable" de retour de la fonction
-                tablesSymboles.putVar("return", $TYPE.text);
-            } 
-            bloc
-            {
-                $code += $bloc.code;
-            } 
-        ;
-
-    params
-        : TYPE IDENTIFIANT
-            {
-                // code java gérant une variable locale (argi)
-                tablesSymboles.putVar($IDENTIFIANT.text, $TYPE.text);
-            }
-            ( ',' TYPE IDENTIFIANT
-                {
-                    // code java gérant une variable locale (argi)
-                    tablesSymboles.putVar($IDENTIFIANT.text, $TYPE.text);
-                }
-            )*
-        ;
-
-    // init nécessaire à cause du ? final et donc args peut être vide (mais $args sera non null)
-    args returns [String code, int size] @init{ $code = new String(); $size = 0;}
-    : (arg0 = expression
-        {
-            // code java pour première expression pour arg
-            $size = 1;
-            $code = $arg0.code;
-        }
-        ( ',' argn = expression
-            {
-                // code java pour expression suivante pour arg
-                $size++;
-                $code += $argn.code;
-            }
-        )*
-    )?
-    ;
 
     expression returns [String code]
         :  a=expression op=('*'|'/') b=expression {$code= $a.code +  $b.code + fo($op.text) + "\n";}
         |  a=expression op=('+'|'-') b=expression {$code= $a.code +  $b.code + fo($op.text) + "\n";}
         |  '(' e=expression ')'  { $code=$e.code ;}
-        | ENTIER {$code = "PUSHI " + $ENTIER.text + "\n";}
-        | IDENTIFIANT '(' args ')'                  // appel de fonction  
-            {  
-                $code = "PUSHI 0\n";
-                $code += $args.code;
-                AdresseType at = tablesSymboles.getFunction($IDENTIFIANT.text);
-                $code += "CALL " + at.adresse + "\n";
-                for(int i = 0; i < $args.size; i++){
-                    $code += "POP\n";
-                }
-            }
+        | ENTIER {$code = "PUSHI " + $ENTIER.text +"\n";}
         | IDENTIFIANT 
             {
-                AdresseType at = tablesSymboles.getAdresseType($IDENTIFIANT.text);
+                AdresseType at = tableSymboles.getAdresseType($IDENTIFIANT.text);
                 int adr = at.adresse;
-                if (adr < 0) {
-                    $code = "PUSHL " + adr + "\n";
-                } else {
-                    $code = "PUSHG " + adr + "\n";
-                }
+                $code = "PUSHG " + adr + "\n";
             }
         ;
 
@@ -164,20 +96,21 @@ grammar Calculette;
             // On place 0 sur la pile & on le stocke à l'emplacement 0
         TYPE IDENTIFIANT finInstruction
             {
-                tablesSymboles.putVar($IDENTIFIANT.text, $TYPE.text);
+                int adr = tableSymboles.getSize();
+                tableSymboles.putVar($IDENTIFIANT.text, "int");
                 $code = "PUSHI 0 \n";
             }
         | TYPE IDENTIFIANT '=' expression finInstruction
             {
-                tablesSymboles.putVar($IDENTIFIANT.text, $TYPE.text);
-                $code = $expression.code + "\n";
+                int adr = tableSymboles.getSize();
+                tableSymboles.putVar($IDENTIFIANT.text, "int");
+                $code = $expression.code;
             }
         ;
 
     bloc returns [ String code ] 
         @init{ $code = new String(); }
-        : '{' NEWLINE*
-        ( instruction { $code += $instruction.code; } )* '}'
+        : '{' (instruction { $code += $instruction.code; })* '}'
         NEWLINE*
         ;
 
@@ -202,7 +135,7 @@ grammar Calculette;
         | 'for' '(' init=assignation ';' c=condition ';' incr=assignation ')' i=instruction
             {
                 int blockLabel = _cur_label;
-                $code = $init.code;
+                $code = init.code;
                 $code += "LABEL " + blockLabel + "\n";
                 $code += $c.code + "\n";
                 nextLabel();
@@ -213,26 +146,6 @@ grammar Calculette;
                 $code += "LABEL " + _cur_label + "\n";
                 nextLabel();
             }
-        | 'repeat' i=instruction 'until' '(' c=condition ')'
-            {
-                int blockLabel = _cur_label;
-                $code = "LABEL " + blockLabel + "\n";
-                $code += $i.code;
-                $code += $c.code + "\n";
-                nextLabel();
-                $code += "JUMPF " + _cur_label + "\n";
-                $code += "JUMP " + blockLabel + "\n";
-                $code += "LABEL " + _cur_label + "\n";
-                nextLabel();
-            }
-
-        | RETURN expression finInstruction 
-            {
-                $code = $expression.code;
-                $code += "STOREL " + "\n";
-                $code += "RETURN\n";
-            }
-
         | expression finInstruction
             {
                 $code = $expression.code;
@@ -250,25 +163,17 @@ grammar Calculette;
     assignation returns [ String code ]
         : IDENTIFIANT '=' expression
             {
-                AdresseType at = tablesSymboles.getAdresseType($IDENTIFIANT.text);
+                AdresseType at = tableSymboles.getAdresseType($IDENTIFIANT.text);
                 int adr = at.adresse;
                 $code = $expression.code;
-                if(adr < 0) {
-                    $code += "STOREL " + adr + "\n";
-                } else {
-                    $code += "STOREG " + adr + "\n";
-                }
+                $code += "STOREG " + adr + "\n";
             }
         | 'read(' IDENTIFIANT ')'
             {
-                AdresseType at = tablesSymboles.getAdresseType($IDENTIFIANT.text);
+                AdresseType at = tableSymboles.getAdresseType($IDENTIFIANT.text);
                 int adr = at.adresse;
                 $code = "READ\n";
-                if(adr < 0) {
-                    $code += "STOREL " + adr + "\n";
-                } else {
-                    $code += "STOREG " + adr + "\n";
-                }
+                $code += "STOREG " + adr + "\n";
             }
         ;
     
@@ -286,8 +191,6 @@ grammar Calculette;
     finInstruction : ( NEWLINE | ';' )+ ;
 
     // lexer
-    RETURN: 'return';
-
     TYPE : 'int' | 'float' ;
 
     IDENTIFIANT : [a-z]+;
@@ -299,5 +202,3 @@ grammar Calculette;
     ENTIER : ('0'..'9')+  ;
 
     UNMATCH : . -> skip ;
-
-

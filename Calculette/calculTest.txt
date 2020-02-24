@@ -1,5 +1,4 @@
-int x
+int x=12
 int y=19
 int z=11
-read(x)
 write(x+y+z)
